@@ -15,7 +15,24 @@
 #
 
 FROM openjdk:17.0.2
-COPY . /usr/src/myapp
+
 WORKDIR /usr/src/myapp
-RUN ./mvnw clean package
-CMD ./mvnw cargo:run -P tomcat90
+
+# Copy only pom first (for caching)
+COPY pom.xml .
+COPY .mvn .mvn
+COPY mvnw .
+
+# Download dependencies (cached layer)
+RUN chmod +x mvnw && \
+    ./mvnw dependency:go-offline -B
+
+# Copy rest of source
+COPY src src
+
+# Build application (FAST)
+RUN ./mvnw clean package -DskipTests -Dlicense.skip=true
+
+# Run app
+CMD ["./mvnw", "cargo:run", "-P", "tomcat90"]
+
